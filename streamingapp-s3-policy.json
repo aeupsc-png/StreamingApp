@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StreamingAppS3ObjectAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::streamingapp-627917841032-ap-south-1/videos/*",
+        "arn:aws:s3:::streamingapp-627917841032-ap-south-1/thumbnails/*"
+      ]
+    }
+  ]
+}

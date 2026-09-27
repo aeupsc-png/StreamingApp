@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming-service
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicas.streaming }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: streaming-service
+  template:
+    metadata:
+      labels:
+        app: streaming-service
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.s3.name }}
+      containers:
+        - name: streaming-service
+          image: "{{ .Values.images.streaming.repository }}:{{ .Values.images.streaming.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.ports.streaming }}
+          envFrom:
+            - configMapRef:
+                name: streamingapp-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: JWT_SECRET
+            - name: PORT
+              value: "3002"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: {{ .Values.ports.streaming }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: {{ .Values.ports.streaming }}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi

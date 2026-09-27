@@ -1,0 +1,55 @@
+namespace: streamingapp
+
+images:
+  auth:
+    repository: 627917841032.dkr.ecr.ap-south-1.amazonaws.com/streaming-auth
+    tag: "1.0.0"
+
+  streaming:
+    repository: 627917841032.dkr.ecr.ap-south-1.amazonaws.com/streaming-service
+    tag: "1.0.1"
+
+  admin:
+    repository: 627917841032.dkr.ecr.ap-south-1.amazonaws.com/streaming-admin
+    tag: "1.0.0"
+
+  chat:
+    repository: 627917841032.dkr.ecr.ap-south-1.amazonaws.com/streaming-chat
+    tag: "1.0.0"
+
+  frontend:
+    repository: 627917841032.dkr.ecr.ap-south-1.amazonaws.com/streaming-frontend
+    tag: "1.0.3"
+
+replicas:
+  auth: 2
+  streaming: 3
+  admin: 2
+  chat: 2
+  frontend: 2
+
+ports:
+  auth: 3001
+  streaming: 3002
+  admin: 3003
+  chat: 3004
+  frontend: 80
+
+secrets:
+  existingSecret: streamingapp-secret
+
+serviceAccount:
+  s3:
+    name: streamingapp-s3
+
+mongodb:
+  image: mongo:7
+  replicas: 1
+  storage: 10Gi
+  storageClass: gp2
+
+ingress:
+  enabled: true
+  className: alb
+  scheme: internet-facing
+  targetType: ip
