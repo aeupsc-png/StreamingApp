@@ -1,4 +1,4 @@
-﻿pipeline {
+pipeline {
     agent any
 
     environment {
@@ -7,7 +7,6 @@
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -28,8 +27,7 @@
         stage('AWS ECR Login') {
             steps {
                 sh '''
-                    aws ecr get-login-password --region "$AWS_REGION" | \
-                    docker login --username AWS --password-stdin "$ECR_REGISTRY"
+                    aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
                 '''
             }
         }
@@ -37,17 +35,10 @@
         stage('Build Images') {
             steps {
                 sh '''
-                    docker build -t "$ECR_REGISTRY/streaming-auth:1.0.0" \
-                      -f backend/authService/Dockerfile backend
-
-                    docker build -t "$ECR_REGISTRY/streaming-service:1.0.1" \
-                      -f backend/streamingService/Dockerfile backend
-
-                    docker build -t "$ECR_REGISTRY/streaming-admin:1.0.0" \
-                      -f backend/adminService/Dockerfile backend
-
-                    docker build -t "$ECR_REGISTRY/streaming-chat:1.0.0" \
-                      -f backend/chatService/Dockerfile backend
+                    docker build -t "$ECR_REGISTRY/streaming-auth:1.0.0" -f backend/authService/Dockerfile backend
+                    docker build -t "$ECR_REGISTRY/streaming-service:1.0.1" -f backend/streamingService/Dockerfile backend
+                    docker build -t "$ECR_REGISTRY/streaming-admin:1.0.0" -f backend/adminService/Dockerfile backend
+                    docker build -t "$ECR_REGISTRY/streaming-chat:1.0.0" -f backend/chatService/Dockerfile backend
 
                     docker build \
                       --build-arg REACT_APP_AUTH_API_URL=/api \
@@ -85,4 +76,4 @@
     }
 }
 
-// Jenkins CI/CD pipeline
+// Project 5 Jenkins pipeline
