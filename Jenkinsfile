@@ -41,7 +41,7 @@ pipeline {
                 withCredentials([
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-ecr'
+                        credentialsId: 'streamingapp-ecr-aws-system'
                     ]
                 ]) {
                     sh '''
@@ -65,7 +65,7 @@ pipeline {
                 withCredentials([
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-ecr'
+                        credentialsId: 'streamingapp-ecr-aws-system'
                     ]
                 ]) {
                     sh '''
@@ -145,7 +145,7 @@ pipeline {
                 withCredentials([
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-ecr'
+                        credentialsId: 'streamingapp-ecr-aws-system'
                     ]
                 ]) {
                     sh '''
@@ -183,7 +183,7 @@ pipeline {
                 withCredentials([
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-ecr'
+                        credentialsId: 'streamingapp-ecr-aws-system'
                     ]
                 ]) {
                     sh '''
