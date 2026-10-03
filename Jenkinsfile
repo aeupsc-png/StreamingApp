@@ -1,35 +1,38 @@
-pipeline {
 
+pipeline {
     agent any
 
-    options {
-        skipDefaultCheckout(true)
-        timestamps()
-    }
-
     environment {
-        AWS_REGION  = 'ap-south-1'
+        AWS_DEFAULT_REGION = 'ap-south-1'
+        AWS_REGION = 'ap-south-1'
+
+        AWS_ACCOUNT_ID = '627917841032'
         ECR_REGISTRY = '627917841032.dkr.ecr.ap-south-1.amazonaws.com'
+
+        AWS_CREDENTIALS_ID = 'streamingapp-aws-final'
+
+        AUTH_IMAGE = 'streaming-auth'
+        STREAMING_IMAGE = 'streaming-service'
+        ADMIN_IMAGE = 'streaming-admin'
+        CHAT_IMAGE = 'streaming-chat'
+        FRONTEND_IMAGE = 'streaming-frontend'
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
+                echo 'Checking out StreamingApp source code from GitHub'
                 checkout scm
+                sh 'git log -1 --oneline'
             }
         }
 
         stage('Verify Tools') {
             steps {
+                echo 'Verifying Docker and AWS CLI installation'
+
                 sh '''
-                    set -e
-
-                    echo "======================================"
-                    echo "Checking Jenkins build environment"
-                    echo "======================================"
-
-                    uname -a
                     docker --version
                     aws --version
                 '''
@@ -39,22 +42,12 @@ pipeline {
         stage('Verify AWS Credentials') {
             steps {
                 withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-final'
-                    ]
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${AWS_CREDENTIALS_ID}"]
                 ]) {
                     sh '''
-                        set -e
-
-                        echo "======================================"
-                        echo "Verifying AWS identity"
-                        echo "======================================"
-
-                        aws sts get-caller-identity \
-                            --region "$AWS_REGION"
-
-                        echo "AWS credentials are working."
+                        echo "Checking AWS identity..."
+                        aws sts get-caller-identity
                     '''
                 }
             }
@@ -63,25 +56,17 @@ pipeline {
         stage('AWS ECR Login') {
             steps {
                 withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-final'
-                    ]
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${AWS_CREDENTIALS_ID}"]
                 ]) {
                     sh '''
-                        set -e
-
-                        echo "======================================"
-                        echo "Logging in to Amazon ECR"
-                        echo "======================================"
+                        echo "Logging in to Amazon ECR..."
 
                         aws ecr get-login-password \
-                            --region "$AWS_REGION" | \
-                            docker login \
+                            --region ${AWS_DEFAULT_REGION} \
+                        | docker login \
                             --username AWS \
-                            --password-stdin "$ECR_REGISTRY"
-
-                        echo "ECR login successful."
+                            --password-stdin ${ECR_REGISTRY}
                     '''
                 }
             }
@@ -89,153 +74,110 @@ pipeline {
 
         stage('Build Images') {
             steps {
+                echo 'Building all StreamingApp Docker images'
+
                 sh '''
                     set -e
 
-                    echo "======================================"
-                    echo "Building StreamingApp Docker Images"
-                    echo "======================================"
-
                     echo "Building Auth Service..."
                     docker build \
-                        -t "$ECR_REGISTRY/streaming-auth:1.0.0" \
+                        -t ${ECR_REGISTRY}/${AUTH_IMAGE}:1.0.0 \
                         -f backend/authService/Dockerfile \
-                        backend
+                        backend/authService
 
                     echo "Building Streaming Service..."
                     docker build \
-                        -t "$ECR_REGISTRY/streaming-service:1.0.1" \
+                        -t ${ECR_REGISTRY}/${STREAMING_IMAGE}:1.0.1 \
                         -f backend/streamingService/Dockerfile \
-                        backend
+                        backend/streamingService
 
                     echo "Building Admin Service..."
                     docker build \
-                        -t "$ECR_REGISTRY/streaming-admin:1.0.0" \
+                        -t ${ECR_REGISTRY}/${ADMIN_IMAGE}:1.0.0 \
                         -f backend/adminService/Dockerfile \
-                        backend
+                        backend/adminService
 
                     echo "Building Chat Service..."
                     docker build \
-                        -t "$ECR_REGISTRY/streaming-chat:1.0.0" \
+                        -t ${ECR_REGISTRY}/${CHAT_IMAGE}:1.0.0 \
                         -f backend/chatService/Dockerfile \
-                        backend
+                        backend/chatService
 
                     echo "Building Frontend..."
                     docker build \
+                        -t ${ECR_REGISTRY}/${FRONTEND_IMAGE}:1.0.3 \
                         --build-arg REACT_APP_AUTH_API_URL=/api \
                         --build-arg REACT_APP_STREAMING_API_URL=/api/streaming \
                         --build-arg REACT_APP_STREAMING_PUBLIC_URL=/ \
                         --build-arg REACT_APP_ADMIN_API_URL=/api/admin \
                         --build-arg REACT_APP_CHAT_API_URL=/api/chat \
                         --build-arg REACT_APP_CHAT_SOCKET_URL=/socket.io \
-                        -t "$ECR_REGISTRY/streaming-frontend:1.0.3" \
+                        -f frontend/Dockerfile \
                         frontend
 
-                    echo "======================================"
-                    echo "All 5 images built successfully."
-                    echo "======================================"
-
-                    docker images | grep "$ECR_REGISTRY"
+                    echo "All Docker images built successfully."
                 '''
             }
         }
 
         stage('Push Images to ECR') {
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-final'
-                    ]
-                ]) {
-                    sh '''
-                        set -e
+                echo 'Pushing Docker images to Amazon ECR'
 
-                        echo "======================================"
-                        echo "Pushing Images to Amazon ECR"
-                        echo "======================================"
+                sh '''
+                    set -e
 
-                        echo "Pushing Auth Service..."
-                        docker push "$ECR_REGISTRY/streaming-auth:1.0.0"
+                    docker push ${ECR_REGISTRY}/${AUTH_IMAGE}:1.0.0
+                    docker push ${ECR_REGISTRY}/${STREAMING_IMAGE}:1.0.1
+                    docker push ${ECR_REGISTRY}/${ADMIN_IMAGE}:1.0.0
+                    docker push ${ECR_REGISTRY}/${CHAT_IMAGE}:1.0.0
+                    docker push ${ECR_REGISTRY}/${FRONTEND_IMAGE}:1.0.3
 
-                        echo "Pushing Streaming Service..."
-                        docker push "$ECR_REGISTRY/streaming-service:1.0.1"
-
-                        echo "Pushing Admin Service..."
-                        docker push "$ECR_REGISTRY/streaming-admin:1.0.0"
-
-                        echo "Pushing Chat Service..."
-                        docker push "$ECR_REGISTRY/streaming-chat:1.0.0"
-
-                        echo "Pushing Frontend..."
-                        docker push "$ECR_REGISTRY/streaming-frontend:1.0.3"
-
-                        echo "======================================"
-                        echo "All 5 images pushed successfully."
-                        echo "======================================"
-                    '''
-                }
+                    echo "All Docker images pushed successfully."
+                '''
             }
         }
 
         stage('Verify ECR Images') {
             steps {
                 withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'streamingapp-aws-final'
-                    ]
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${AWS_CREDENTIALS_ID}"]
                 ]) {
                     sh '''
                         set -e
 
-                        echo "======================================"
-                        echo "Verifying Images in Amazon ECR"
-                        echo "======================================"
-
-                        echo "Auth Service:"
+                        echo "Verifying Auth image..."
                         aws ecr describe-images \
-                            --repository-name streaming-auth \
+                            --repository-name ${AUTH_IMAGE} \
                             --image-ids imageTag=1.0.0 \
-                            --region "$AWS_REGION" \
-                            --query 'imageDetails[0].{Tag:imageTags[0],Digest:imageDigest}' \
-                            --output table
+                            --region ${AWS_DEFAULT_REGION}
 
-                        echo "Streaming Service:"
+                        echo "Verifying Streaming image..."
                         aws ecr describe-images \
-                            --repository-name streaming-service \
+                            --repository-name ${STREAMING_IMAGE} \
                             --image-ids imageTag=1.0.1 \
-                            --region "$AWS_REGION" \
-                            --query 'imageDetails[0].{Tag:imageTags[0],Digest:imageDigest}' \
-                            --output table
+                            --region ${AWS_DEFAULT_REGION}
 
-                        echo "Admin Service:"
+                        echo "Verifying Admin image..."
                         aws ecr describe-images \
-                            --repository-name streaming-admin \
+                            --repository-name ${ADMIN_IMAGE} \
                             --image-ids imageTag=1.0.0 \
-                            --region "$AWS_REGION" \
-                            --query 'imageDetails[0].{Tag:imageTags[0],Digest:imageDigest}' \
-                            --output table
+                            --region ${AWS_DEFAULT_REGION}
 
-                        echo "Chat Service:"
+                        echo "Verifying Chat image..."
                         aws ecr describe-images \
-                            --repository-name streaming-chat \
+                            --repository-name ${CHAT_IMAGE} \
                             --image-ids imageTag=1.0.0 \
-                            --region "$AWS_REGION" \
-                            --query 'imageDetails[0].{Tag:imageTags[0],Digest:imageDigest}' \
-                            --output table
+                            --region ${AWS_DEFAULT_REGION}
 
-                        echo "Frontend:"
+                        echo "Verifying Frontend image..."
                         aws ecr describe-images \
-                            --repository-name streaming-frontend \
+                            --repository-name ${FRONTEND_IMAGE} \
                             --image-ids imageTag=1.0.3 \
-                            --region "$AWS_REGION" \
-                            --query 'imageDetails[0].{Tag:imageTags[0],Digest:imageDigest}' \
-                            --output table
+                            --region ${AWS_DEFAULT_REGION}
 
-                        echo "======================================"
-                        echo "ECR verification successful."
-                        echo "======================================"
+                        echo "All ECR images verified successfully."
                     '''
                 }
             }
@@ -245,31 +187,26 @@ pipeline {
     post {
         success {
             echo '''
-========================================
-STREAMINGAPP JENKINS PIPELINE SUCCESS
-========================================
-All five Docker images were:
-1. Built successfully
-2. Pushed to Amazon ECR
-3. Verified in Amazon ECR
-========================================
-'''
+            ==========================================
+            SUCCESS: STREAMINGAPP CI PIPELINE PASSED
+            ==========================================
+            All Docker images were built, pushed to
+            Amazon ECR, and verified successfully.
+            '''
         }
 
         failure {
             echo '''
-========================================
-STREAMINGAPP JENKINS PIPELINE FAILED
-========================================
-Check the failed stage and console output.
-========================================
-'''
+            ==========================================
+            FAILURE: STREAMINGAPP CI PIPELINE FAILED
+            ==========================================
+            Check the Jenkins Console Output to identify
+            the stage and error.
+            '''
         }
 
         always {
-            sh '''
-                echo "Jenkins pipeline completed."
-            '''
+            echo 'StreamingApp Jenkins pipeline execution completed.'
         }
     }
 }
